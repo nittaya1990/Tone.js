@@ -42,7 +42,7 @@ export interface PolySynthOptions<Voice> extends InstrumentOptions {
 
 /**
  * PolySynth handles voice creation and allocation for any
- * instruments passed in as the second paramter. PolySynth is
+ * instruments passed in as the second parameter. PolySynth is
  * not a synthesizer by itself, it merely manages voices of
  * one of the other types of synths, allowing any of the
  * monophonic synthesizers to be polyphonic.
@@ -176,6 +176,7 @@ export class PolySynth<Voice extends Monophonic<any> = Synth> extends Instrument
 				context: this.context,
 				onsilence: this._makeVoiceAvailable.bind(this),
 			}));
+			assert(voice instanceof Monophonic, "Voice must extend Monophonic class");
 			voice.connect(this.output);
 			this._voices.push(voice);
 			return voice;
@@ -340,9 +341,19 @@ export class PolySynth<Voice extends Monophonic<any> = Synth> extends Instrument
 		if (this._syncState()) {
 			this._syncMethod("triggerAttack", 1);
 			this._syncMethod("triggerRelease", 1);
+
+			// make sure that the sound doesn't play after its been stopped
+			this.context.transport.on("stop", this._syncedRelease);
+			this.context.transport.on("pause", this._syncedRelease);
+			this.context.transport.on("loopEnd", this._syncedRelease);
 		}
 		return this;
 	}
+
+	/**
+	 * The release which is scheduled to the timeline. 
+	 */
+	 protected _syncedRelease = (time: number) => this.releaseAll(time);
 
 	/**
 	 * Set a member/attribute of the voices
@@ -381,7 +392,7 @@ export class PolySynth<Voice extends Monophonic<any> = Synth> extends Instrument
 		});
 		return this;
 	}
-
+	
 	dispose(): this {
 		super.dispose();
 		this._dummyVoice.dispose();
